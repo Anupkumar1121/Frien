@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>frien. — NIT Agartala Campus Social Network</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Outfit', 'sans-serif'],
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            surface: {
+              950: '#090a0f',
+              900: '#12141d',
+              850: '#181b26',
+              800: '#212534',
+              700: '#2e3346',
+            },
+            vibe: {
+              emerald: '#10b981',
+              coral: '#f43f5e',
+              amber: '#f59e0b',
+              violet: '#8b5cf6'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen font-sans antialiased selection:bg-vibe-emerald selection:text-surface-950">
+
+  <!-- Toast Notifications -->
+  <div id="toastContainer" class="fixed top-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ================= VIEW 1: LOGIN & REGISTRATION (PRODUCTION CLEAN) ================= -->
+  <div id="authView" class="min-h-screen flex flex-col justify-between p-6 bg-radial-glow">
+    <header class="w-full max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-vibe-emerald via-teal-500 to-vibe-coral flex items-center justify-center shadow-lg">
+          <span class="font-display font-extrabold text-2xl text-surface-950">f.</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-display font-bold text-2xl">frien<span class="text-vibe-emerald">.</span></span>
+            <span class="text-[11px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-vibe-emerald/15 text-vibe-emerald border border-vibe-emerald/30">NIT Agartala</span>
+          </div>
+          <p class="text-xs text-gray-400">Swipe • Hangout • Jam • Ranked Arcade</p>
+        </div>
+      </div>
+      <div class="text-xs font-mono text-gray-400 glass-card px-4 py-2 rounded-2xl">
+        Registered Students: <span id="savedAccountsCount" class="text-vibe-emerald font-bold">0</span>
+      </div>
+    </header>
+
+    <main class="w-full max-w-md mx-auto my-6 glass-card rounded-3xl p-7 shadow-2xl">
+      <div class="inline-flex p-1.5 rounded-2xl bg-surface-950 border border-surface-800 w-full mb-6">
+        <button id="tabRegister" onclick="switchAuthTab('register')" class="flex-1 py-2.5 rounded-xl font-display font-semibold text-sm bg-surface-800 text-white shadow">
+          Join Campus
+        </button>
+        <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 py-2.5 rounded-xl font-display font-semibold text-sm text-gray-400">
+          Sign In
+        </button>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Full Name</label>
+          <input type="text" id="regName" required placeholder="Enter your full name" class="input-modern w-full px-4 py-2.5 rounded-2xl text-sm text-white">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Branch</label>
+            <select id="regBranch" class="input-modern w-full px-3 py-2.5 rounded-2xl text-xs text-white">
+              <option value="ECE">ECE</option>
+              <option value="CSE">CSE</option>
+              <option value="EE">EE</option>
+              <option value="ME">Mechanical (ME)</option>
+              <option value="CE">Civil (CE)</option>
+              <option value="EIE">EIE</option>
+              <option value="PE">Production (PE)</option>
+              <option value="ChE">Chemical (ChE)</option>
+              <option value="BT">Biotech (BT)</option>
+              <option value="BS-MS">BS-MS Dual</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Present Year</label>
+            <select id="regYear" class="input-modern w-full px-3 py-2.5 rounded-2xl text-xs text-white">
+              <option value="1st Year">1st Year</option>
+              <option value="2nd Year">2nd Year</option>
+              <option value="3rd Year">3rd Year</option>
+              <option value="4th Year">4th Year</option>
+              <option value="5th Year">5th Year</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Unique Handle</label>
+            <input type="text" id="regUsername" required placeholder="your_handle" class="input-modern w-full px-3.5 py-2.5 rounded-2xl text-sm text-white font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Password</label>
+            <input type="password" id="regPassword" required placeholder="••••••••" class="input-modern w-full px-3.5 py-2.5 rounded-2xl text-sm text-white">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Hobby</label>
+            <select id="regHobby" class="input-modern w-full px-3 py-2.5 rounded-2xl text-xs text-white">
+              <option value="🏸 Badminton">🏸 Badminton</option>
+              <option value="🎮 PC Gaming">🎮 PC Gaming</option>
+              <option value="💻 Coding">💻 Coding</option>
+              <option value="🎧 Music">🎧 Music</option>
+              <option value="♟️ Chess">♟️ Chess</option>
+              <option value="📸 Photography">📸 Photography</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Account Privacy</label>
+            <select id="regPrivacy" class="input-modern w-full px-3 py-2.5 rounded-2xl text-xs text-white">
+              <option value="private">🔒 Private</option>
+              <option value="public">🌐 Public</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="w-full py-3 rounded-2xl bg-gradient-to-r from-vibe-emerald to-teal-500 text-surface-950 font-display font-bold text-sm shadow-lg">
+          Create Account & Enter
+        </button>
+      </form>
+
+      <!-- LOGIN FORM (No Trial/Demo Quick-Fill Buttons; Admin Login Works Directly Here) -->
+      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Username</label>
+          <input type="text" id="loginUsername" required placeholder="Enter your handle" class="input-modern w-full px-4 py-2.5 rounded-2xl text-sm text-white font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Password</label>
+          <input type="password" id="loginPassword" required placeholder="••••••••" class="input-modern w-full px-4 py-2.5 rounded-2xl text-sm text-white">
+        </div>
+        <button type="submit" class="w-full py-3 rounded-2xl bg-gradient-to-r from-vibe-emerald to-teal-500 text-surface-950 font-display font-bold text-sm shadow-lg">
+          Sign In to Campus Hub
+        </button>
+      </form>
+    </main>
+
+    <footer class="text-center text-xs text-gray-500 font-mono">
+      frien. NIT Agartala — Exclusive Campus Social Platform
+    </footer>
+  </div>
+
+  <!-- ================= VIEW 2: MAIN SOCIAL APP SHELL ================= -->
+  <div id="dashboardView" class="hidden h-screen w-screen overflow-hidden flex flex-col bg-surface-950">
+    <!-- TOP FLOATING NAVIGATION BAR -->
+    <header class="h-16 px-4 lg:px-6 border-b border-surface-800/80 bg-surface-900/70 backdrop-blur-xl flex items-center justify-between shrink-0 z-30">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-vibe-emerald to-vibe-coral flex items-center justify-center font-display font-extrabold text-surface-950 text-lg">
+          f.
+        </div>
+        <span class="font-display font-bold text-xl tracking-tight hidden sm:inline">frien<span class="text-vibe-emerald">.</span></span>
+      </div>
+
+      <!-- Center Pill Tabs -->
+      <nav class="flex items-center gap-1 p-1.5 rounded-2xl bg-surface-950 border border-surface-800 overflow-x-auto">
+        <button id="navSwipe" onclick="switchTab('swipe')" class="nav-pill active flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-display font-semibold transition">
+          <i data-lucide="flame" class="w-4 h-4"></i>
+          <span>Swipe</span>
+        </button>
+        <button id="navChat" onclick="switchTab('chat')" class="nav-pill flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-display font-semibold text-gray-400 transition">
+          <i data-lucide="message-circle" class="w-4 h-4"></i>
+          <span>Lounge</span>
+        </button>
+        <button id="navMusic" onclick="switchTab('music')" class="nav-pill flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-display font-semibold text-gray-400 transition">
+          <i data-lucide="headphones" class="w-4 h-4"></i>
+          <span>Music Jam</span>
+        </button>
+        <button id="navArcade" onclick="switchTab('arcade')" class="nav-pill flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-display font-semibold text-gray-400 transition">
+          <i data-lucide="gamepad-2" class="w-4 h-4"></i>
+          <span>Arcade</span>
+          <span id="arcadeInviteBadge" class="hidden px-1.5 py-0.2 rounded-full bg-vibe-amber text-surface-950 text-[10px] font-mono font-bold">0</span>
+        </button>
+        <button id="navFriends" onclick="switchTab('friends')" class="nav-pill flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-display font-semibold text-gray-400 transition">
+          <i data-lucide="user-check" class="w-4 h-4"></i>
+          <span>Friends</span>
+          <span id="pendingReqBadge" class="px-1.5 py-0.2 rounded-full bg-vibe-coral text-white text-[10px] font-mono">0</span>
+        </button>
+        <!-- Root Admin Button (Only visible when logged in as Skywalker042) -->
+        <button id="navAdmin" onclick="openAdminModal()" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono bg-vibe-amber/20 text-vibe-amber border border-vibe-amber/40">
+          <i data-lucide="shield" class="w-3.5 h-3.5"></i> Admin
+        </button>
+      </nav>
+
+      <!-- Right User Pill, ELO Badge & Privacy Toggle -->
+      <div class="flex items-center gap-2.5">
+        <div class="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-vibe-amber/10 border border-vibe-amber/30 text-vibe-amber text-xs font-mono font-bold">
+          <span>🏆</span>
+          <span id="myTopEloBadge">1200 ELO</span>
+        </div>
+        <button id="privacyToggleBtn" onclick="toggleMyPrivacy()" class="px-2.5 py-1.5 rounded-xl bg-surface-850 border border-surface-700 text-xs font-mono text-gray-200">
+          🔒 Private
+        </button>
+        <div class="flex items-center gap-2 pl-2 border-l border-surface-800">
+          <div id="myTopAvatar" class="w-9 h-9 rounded-xl bg-vibe-emerald text-surface-950 font-display font-bold flex items-center justify-center">
+            U
+          </div>
+          <div class="hidden md:block leading-tight">
+            <div id="myTopUsername" class="text-xs font-mono font-bold text-white">@user</div>
+            <div id="myTopActivity" class="text-[10px] text-vibe-emerald truncate max-w-[110px]">🔥 Online</div>
+          </div>
+          <button onclick="logout()" title="Sign Out" class="p-2 rounded-xl bg-surface-850 hover:bg-vibe-coral/20 hover:text-vibe-coral text-gray-400 transition">
+            <i data-lucide="power" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN WORKSPACE GRID -->
+    <div class="flex-1 flex overflow-hidden p-3 lg:p-4 gap-3 lg:gap-4 w-full">
+
+      <!-- ================= TAB 1: ENDLESS CAMPUS SWIPE ================= -->
+      <section id="tabSwipeView" class="flex-1 flex items-center justify-center relative overflow-hidden rounded-3xl min-w-0">
+        <button onclick="openCreatePostModal()" class="absolute top-5 left-5 z-20 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-vibe-coral to-pink-600 text-white font-display font-bold text-xs shadow-xl">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          Share to Swipe
+        </button>
+        <div class="hidden sm:flex flex-col gap-2 absolute right-6 top-1/2 -translate-y-1/2 z-20">
+          <button onclick="scrollSwipeFeed(-1)" class="p-3 rounded-2xl bg-surface-900/80 border border-surface-700 hover:border-vibe-emerald text-white">
+            <i data-lucide="chevron-up" class="w-5 h-5"></i>
+          </button>
+          <button onclick="scrollSwipeFeed(1)" class="p-3 rounded-2xl bg-surface-900/80 border border-surface-700 hover:border-vibe-emerald text-white">
+            <i data-lucide="chevron-down" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div id="swipeFeedContainer" class="h-full w-full max-w-md mx-auto overflow-y-scroll snap-y-mandatory no-scrollbar space-y-4"></div>
+      </section>
+
+      <!-- ================= TAB 2: LOUNGE & DMS VIEW ================= -->
+      <section id="tabChatView" class="hidden flex-1 flex gap-3 lg:gap-4 overflow-hidden min-w-0">
+        <div class="w-60 glass-card rounded-3xl flex flex-col overflow-hidden shrink-0">
+          <div class="p-4 border-b border-surface-800">
+            <h3 class="font-display font-bold text-sm text-white">Campus Lounges</h3>
+            <div id="loungeList" class="mt-2 space-y-1"></div>
+          </div>
+          <div class="p-4 flex-1 overflow-y-auto">
+            <h3 class="font-display font-bold text-sm text-white mb-2">Direct Messages</h3>
+            <div id="dmList" class="space-y-1"></div>
+          </div>
+        </div>
+
+        <div class="flex-1 glass-card rounded-3xl flex flex-col overflow-hidden min-w-0">
+          <div class="h-14 px-5 border-b border-surface-800 flex items-center justify-between">
+            <div>
+              <h3 id="chatHeaderTitle" class="font-display font-bold text-white text-sm">#general-nita</h3>
+              <p id="chatHeaderSub" class="text-[11px] text-gray-400">Campus-wide hangout chat</p>
+            </div>
+          </div>
+          <div id="messagesContainer" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
+          <div id="chatMediaPreview" class="hidden px-5 py-2 bg-surface-900 border-t border-surface-800 flex items-center justify-between text-xs font-mono text-vibe-emerald">
+            <span id="chatMediaName">file attached</span>
+            <button onclick="clearChatMedia()" class="text-vibe-coral">Remove</button>
+          </div>
+          <form onsubmit="sendChatMessage(event)" class="p-3.5 border-t border-surface-800 flex items-center gap-2.5">
+            <label class="cursor-pointer p-2.5 rounded-2xl bg-surface-850 hover:bg-surface-800 text-gray-300">
+              <i data-lucide="image-plus" class="w-5 h-5"></i>
+              <input type="file" id="chatMediaInput" accept="image/*,video/*" onchange="handleChatMedia(event)" class="hidden">
+            </label>
+            <input type="text" id="chatInput" placeholder="Write a message..." autocomplete="off" class="input-modern flex-1 px-4 py-2.5 rounded-2xl text-sm text-white">
+            <button type="submit" class="px-5 py-2.5 rounded-2xl bg-vibe-emerald text-surface-950 font-display font-bold text-xs">Send</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ================= TAB 3: MUSIC LOUNGE (WITH ROOM CHAT & INVITES) ================= -->
+      <section id="tabMusicView" class="hidden flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 overflow-hidden min-w-0">
+        <div class="w-full lg:w-64 glass-card rounded-3xl flex flex-col overflow-hidden shrink-0">
+          <div class="p-3.5 border-b border-surface-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <h3 class="font-display font-bold text-xs text-white uppercase font-mono">Search Songs</h3>
+              <label class="cursor-pointer text-[11px] font-mono text-vibe-emerald hover:underline">
+                + Local MP3
+                <input type="file" accept="audio/*" onchange="loadLocalAudioFile(event)" class="hidden">
+              </label>
+            </div>
+            <form onsubmit="searchMusic(event)" class="flex gap-1.5">
+              <input type="text" id="musicSearchInput" placeholder="Song, artist, Lo-Fi..." class="input-modern flex-1 px-3 py-1.5 rounded-xl text-xs text-white">
+              <button type="submit" class="px-3 py-1.5 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">Go</button>
+            </form>
+          </div>
+
+          <div id="musicResultsList" class="flex-1 overflow-y-auto p-2.5 space-y-1"></div>
+
+          <div class="p-3 border-t border-surface-800 bg-surface-950/60 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono uppercase text-vibe-coral font-bold">🎧 Group Jam Rooms</span>
+              <button onclick="syncRoomToMyTrack()" class="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-vibe-emerald/15 text-vibe-emerald border border-vibe-emerald/30">
+                Sync
+              </button>
+            </div>
+            <div id="jamRoomsList" class="space-y-1.5"></div>
+          </div>
+        </div>
+
+        <div class="flex-1 glass-card rounded-3xl flex flex-col overflow-hidden min-w-0">
+          <div class="h-12 px-4 border-b border-surface-800 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-2 h-2 rounded-full bg-vibe-coral animate-ping shrink-0"></span>
+              <span id="activeJamRoomBanner" class="text-xs font-mono text-gray-200 truncate">Music Jam Lounge</span>
+            </div>
+            <div id="jamListenersPills" class="flex items-center gap-1 overflow-x-auto"></div>
+          </div>
+
+          <div class="flex-1 grid grid-cols-1 md:grid-cols-3 overflow-hidden divide-y md:divide-y-0 md:divide-x divide-surface-800">
+            <div class="p-3.5 flex flex-col justify-between overflow-y-auto space-y-3">
+              <div class="flex flex-col items-center text-center pt-1">
+                <img id="playerArtwork" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80" class="w-28 h-28 rounded-2xl object-cover shadow-xl border border-surface-700 mb-2">
+                <h2 id="playerTitle" class="font-display font-bold text-sm text-white truncate max-w-full">Select a Track</h2>
+                <p id="playerArtist" class="text-[11px] font-mono text-vibe-emerald">NIT Agartala Music Lounge</p>
+              </div>
+              <div class="space-y-1.5">
+                <div class="text-[10px] font-mono uppercase text-gray-400 flex items-center justify-between">
+                  <span>Invite Classmates</span>
+                  <span class="text-vibe-emerald">Live</span>
+                </div>
+                <div id="musicInvitePeersContainer" class="space-y-1.5 max-h-40 overflow-y-auto"></div>
+              </div>
+            </div>
+
+            <div class="flex flex-col h-full overflow-hidden bg-surface-950/40">
+              <div class="px-4 py-2 border-b border-surface-800 flex items-center justify-between">
+                <span class="text-[11px] font-mono uppercase text-gray-400">🎤 Synced Lyrics</span>
+                <span class="text-[10px] font-mono text-vibe-emerald">Live</span>
+              </div>
+              <div id="lyricsContainer" class="flex-1 overflow-y-auto p-4 space-y-2 text-center select-text">
+                <p class="text-xs text-gray-400 font-mono mt-10">Play any track to load synced lyrics.</p>
+              </div>
+            </div>
+
+            <div class="flex flex-col h-full overflow-hidden bg-surface-950/30">
+              <div class="px-4 py-2 border-b border-surface-800 flex items-center justify-between">
+                <span class="text-[11px] font-mono uppercase text-vibe-emerald font-bold">💬 Jam Room Chat</span>
+              </div>
+              <div id="roomMessagesContainer" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
+              <form onsubmit="sendRoomMessage(event)" class="p-2.5 border-t border-surface-800 flex gap-1.5">
+                <input type="text" id="roomChatInput" placeholder="Chat in room..." autocomplete="off" class="input-modern flex-1 px-3 py-1.5 rounded-xl text-xs text-white">
+                <button type="submit" class="px-3 py-1.5 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">Send</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="p-3 bg-surface-900/90 border-t border-surface-800 space-y-1.5 shrink-0">
+            <div class="flex items-center gap-2.5">
+              <span id="currentTimeLabel" class="text-[10px] font-mono text-gray-400 w-8 text-right">0:00</span>
+              <input type="range" id="seekSlider" min="0" max="100" value="0" oninput="seekAudio(this.value)" class="flex-1 accent-emerald-400 cursor-pointer">
+              <span id="durationLabel" class="text-[10px] font-mono text-gray-400 w-8">0:30</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <button onclick="toggleLoop()" id="loopBtn" class="px-2.5 py-1 rounded-xl bg-surface-850 text-[11px] font-mono text-gray-400">🔁 Loop Off</button>
+              <div class="flex items-center gap-2">
+                <button onclick="prevTrack()" class="px-2.5 py-1.5 rounded-xl bg-surface-850 hover:bg-surface-800 text-xs">⏮</button>
+                <button onclick="togglePlayPause()" id="mainPlayBtn" class="px-5 py-1.5 rounded-xl bg-vibe-emerald text-surface-950 font-display font-bold text-xs">▶ Play</button>
+                <button onclick="nextTrack()" class="px-2.5 py-1.5 rounded-xl bg-surface-850 hover:bg-surface-800 text-xs">⏭</button>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs">🔊</span>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.85" oninput="changeVolume(this.value)" class="w-16 accent-emerald-400">
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 4: RANKED MULTIPLAYER ARCADE ================= -->
+      <section id="tabArcadeView" class="hidden flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 overflow-hidden min-w-0">
+        <div class="w-full lg:w-64 glass-card rounded-3xl flex flex-col overflow-hidden shrink-0">
+          <div class="p-3.5 border-b border-surface-800">
+            <h3 class="font-display font-bold text-xs uppercase font-mono text-white">🕹️ Ranked Arcade (10)</h3>
+            <p class="text-[10px] text-gray-400">2 players required on board to start</p>
+          </div>
+
+          <div id="arcadeGamesList" class="flex-1 overflow-y-auto p-2.5 space-y-1"></div>
+
+          <div class="p-3 border-t border-surface-800 bg-vibe-amber/5 space-y-1.5">
+            <div class="flex items-center justify-between text-[10px] font-mono uppercase text-vibe-amber font-bold">
+              <span>📩 Open Match Invites</span>
+              <span id="openInvitesCount">0</span>
+            </div>
+            <div id="arcadeIncomingInvitesList" class="space-y-1.5 max-h-28 overflow-y-auto"></div>
+          </div>
+
+          <div class="p-3 border-t border-surface-800 bg-surface-950/70 space-y-1.5">
+            <div class="text-[10px] font-mono uppercase text-vibe-emerald font-bold flex items-center justify-between">
+              <span>🏆 Campus ELO Rankings</span>
+              <span>Rating</span>
+            </div>
+            <div id="arcadeLeaderboardList" class="space-y-1 max-h-32 overflow-y-auto"></div>
+          </div>
+        </div>
+
+        <div class="flex-1 glass-card rounded-3xl flex flex-col overflow-hidden min-w-0">
+          <div class="h-14 px-4 border-b border-surface-800 flex items-center justify-between shrink-0">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 id="arcadeActiveTitle" class="font-display font-bold text-white text-sm truncate">♟️ Live Campus Chess</h3>
+                <span id="arcadeRoomStateBadge" class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-vibe-amber/20 text-vibe-amber border border-vibe-amber/30">
+                  🔒 Waiting for Player 2 (1/2)
+                </span>
+              </div>
+              <p id="arcadeActiveSub" class="text-[11px] font-mono text-gray-400 truncate">Ranked Stakes: ELO Rating Match</p>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button id="modePlayBtn" onclick="toggleArcadeMode('play')" class="px-2.5 py-1.5 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">🎮 Player</button>
+              <button id="modeSpectateBtn" onclick="toggleArcadeMode('spectate')" class="px-2.5 py-1.5 rounded-xl bg-surface-850 text-gray-400 text-xs">👀 Spectate</button>
+              <button onclick="leaveOrResetBoard()" class="px-2.5 py-1.5 rounded-xl bg-surface-800 hover:bg-vibe-coral/20 hover:text-vibe-coral text-xs text-gray-300 font-mono">Leave / Reset</button>
+            </div>
+          </div>
+
+          <div class="flex-1 grid grid-cols-1 xl:grid-cols-3 overflow-hidden divide-y xl:divide-y-0 xl:divide-x divide-surface-800">
+            <div class="xl:col-span-2 p-5 flex flex-col items-center justify-center overflow-y-auto relative">
+              <div id="arcadeLobbyOverlay" class="w-full max-w-md rounded-3xl bg-surface-900/90 border border-surface-700 p-6 text-center space-y-5 shadow-2xl">
+                <div class="space-y-1">
+                  <span class="px-3 py-1 rounded-full bg-vibe-amber/15 text-vibe-amber font-mono text-[11px] font-bold">
+                    🔒 2 PLAYERS REQUIRED TO START
+                  </span>
+                  <h4 id="lobbyGameName" class="font-display font-bold text-lg text-white pt-1">Live Campus Chess</h4>
+                  <p class="text-xs text-gray-400">Invite an online classmate below or accept an incoming match invite to unlock the board.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="p-3.5 rounded-2xl bg-surface-950 border border-vibe-emerald/40 flex flex-col items-center space-y-1">
+                    <div id="seat1Avatar" class="w-11 h-11 rounded-xl bg-vibe-emerald text-surface-950 font-display font-extrabold flex items-center justify-center text-base">U</div>
+                    <div id="seat1Name" class="text-xs font-mono font-bold text-white">@you</div>
+                    <div id="seat1Elo" class="text-[10px] font-mono text-vibe-emerald">1200 ELO • Ready</div>
+                  </div>
+
+                  <div id="seat2Card" class="p-3.5 rounded-2xl bg-surface-950 border border-dashed border-surface-700 flex flex-col items-center justify-center space-y-1">
+                    <div id="seat2Avatar" class="w-11 h-11 rounded-xl bg-surface-800 text-gray-500 font-mono flex items-center justify-center text-base">?</div>
+                    <div id="seat2Name" class="text-xs font-mono text-gray-400">Waiting...</div>
+                    <div id="seat2Elo" class="text-[10px] font-mono text-vibe-amber">Invite a peer</div>
+                  </div>
+                </div>
+
+                <div class="text-left space-y-2">
+                  <div class="text-[10px] font-mono uppercase text-gray-400">Invite Registered Classmate:</div>
+                  <div id="arcadeInvitePeersList" class="space-y-1.5 max-h-36 overflow-y-auto"></div>
+                </div>
+              </div>
+
+              <div id="arcadeBoardContainer" class="hidden w-full flex flex-col items-center justify-center"></div>
+            </div>
+
+            <div class="flex flex-col h-full overflow-hidden bg-surface-950/40">
+              <div class="px-4 py-2.5 border-b border-surface-800 flex items-center justify-between">
+                <span class="text-xs font-mono uppercase text-vibe-amber font-bold">🏟️ Arena Chat</span>
+                <div class="flex gap-1">
+                  <button onclick="sendQuickReaction('🔥')" class="px-1.5 py-0.5 rounded bg-surface-800 text-xs">🔥</button>
+                  <button onclick="sendQuickReaction('👏')" class="px-1.5 py-0.5 rounded bg-surface-800 text-xs">👏</button>
+                  <button onclick="sendQuickReaction('🤯')" class="px-1.5 py-0.5 rounded bg-surface-800 text-xs">🤯</button>
+                  <button onclick="sendQuickReaction('GG!')" class="px-1.5 py-0.5 rounded bg-surface-800 text-[10px] font-mono text-vibe-emerald">GG</button>
+                </div>
+              </div>
+              <div id="arcadeChatContainer" class="flex-1 overflow-y-auto p-3.5 space-y-2"></div>
+              <form onsubmit="sendArcadeChatMessage(event)" class="p-3 border-t border-surface-800 flex gap-1.5">
+                <input type="text" id="arcadeChatInput" placeholder="Chat in arena..." autocomplete="off" class="input-modern flex-1 px-3 py-2 rounded-xl text-xs text-white">
+                <button type="submit" class="px-3 py-2 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">Send</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 5: FRIENDS & PRIVACY UNLOCKS ================= -->
+      <section id="tabFriendsView" class="hidden flex-1 glass-card rounded-3xl p-6 overflow-y-auto space-y-6 min-w-0">
+        <div>
+          <h3 class="text-xs font-mono uppercase tracking-wider text-vibe-coral mb-3">Incoming Friend Requests</h3>
+          <div id="requestsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        </div>
+        <div>
+          <h3 class="text-xs font-mono uppercase tracking-wider text-vibe-emerald mb-3">Your Connected Friends</h3>
+          <div id="friendsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        </div>
+      </section>
+
+      <!-- ================= RIGHT SIDEBAR: LIVE CAMPUS RADAR ================= -->
+      <aside class="w-64 xl:w-72 glass-card rounded-3xl flex flex-col overflow-hidden shrink-0 hidden lg:flex">
+        <div class="p-3.5 border-b border-surface-800 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-vibe-emerald animate-pulse"></span>
+            <h3 class="font-display font-bold text-xs uppercase font-mono text-white">Live Campus Radar</h3>
+          </div>
+          <span class="text-[10px] font-mono text-vibe-emerald">Click user</span>
+        </div>
+
+        <div id="radarInvitesBox" class="hidden p-3 bg-vibe-amber/10 border-b border-vibe-amber/30 space-y-1.5">
+          <div class="text-[10px] font-mono uppercase text-vibe-amber font-bold">⚡ Live Campus Invites</div>
+          <div id="radarInvitesList" class="space-y-1.5"></div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-3 space-y-4">
+          <div>
+            <div class="text-[10px] font-mono uppercase text-vibe-emerald mb-1.5 px-1">Active Now (<span id="onlineCount">0</span>)</div>
+            <div id="radarOnlineList" class="space-y-1.5"></div>
+          </div>
+          <div>
+            <div class="text-[10px] font-mono uppercase text-vibe-amber mb-1.5 px-1">Idle (<span id="idleCount">0</span>)</div>
+            <div id="radarIdleList" class="space-y-1.5"></div>
+          </div>
+          <div>
+            <div class="text-[10px] font-mono uppercase text-gray-500 mb-1.5 px-1">Offline (<span id="offlineCount">0</span>)</div>
+            <div id="radarOfflineList" class="space-y-1.5"></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- PERSISTENT MINI MUSIC BAR -->
+    <div id="miniPlayerBar" class="hidden h-14 px-6 bg-surface-900/95 border-t border-vibe-emerald/30 flex items-center justify-between shrink-0 z-30">
+      <div onclick="switchTab('music')" class="flex items-center gap-3 cursor-pointer">
+        <img id="miniPlayerArt" src="" class="w-9 h-9 rounded-xl object-cover">
+        <div>
+          <div id="miniPlayerTitle" class="text-xs font-bold text-white">Song Title</div>
+          <div id="miniPlayerArtist" class="text-[10px] font-mono text-vibe-emerald">Artist</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="togglePlayPause()" id="miniPlayBtn" class="px-4 py-1.5 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">⏸ Pause</button>
+        <button onclick="switchTab('music')" class="px-3 py-1.5 rounded-xl bg-surface-800 text-xs text-gray-300">Open Studio</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: CREATE NEW SWIPE POST ================= -->
+  <div id="createPostModal" class="fixed inset-0 z-50 hidden bg-surface-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md glass-card rounded-3xl p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-display font-bold text-lg text-white">Share to Campus Swipe</h3>
+        <button onclick="closeCreatePostModal()" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form onsubmit="submitNewSwipePost(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Upload Photo or Video (Optional)</label>
+          <input type="file" id="postMediaInput" accept="image/*,video/*" class="text-xs text-gray-300">
+        </div>
+        <div>
+          <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Caption / Campus Thought</label>
+          <textarea id="postCaptionInput" required rows="3" placeholder="What's happening at NIT Agartala?" class="input-modern w-full p-3 rounded-2xl text-sm text-white"></textarea>
+        </div>
+        <button type="submit" class="w-full py-3 rounded-2xl bg-gradient-to-r from-vibe-coral to-pink-600 text-white font-display font-bold text-sm">
+          Publish to Endless Swipe
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: PEER PROFILE CARD ================= -->
+  <div id="peerModal" class="fixed inset-0 z-50 hidden bg-surface-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-sm glass-card rounded-3xl p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <div id="modalAvatar" class="w-14 h-14 rounded-2xl bg-vibe-emerald text-surface-950 font-display font-extrabold text-2xl flex items-center justify-center">U</div>
+        <button onclick="closePeerModal()" class="p-2 rounded-full bg-surface-850 text-gray-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div>
+        <div class="flex items-center justify-between">
+          <h3 id="modalHandle" class="font-mono font-bold text-lg text-white">@handle</h3>
+          <span id="modalEloBadge" class="px-2.5 py-1 rounded-xl bg-vibe-amber/15 border border-vibe-amber/40 text-vibe-amber font-mono text-xs font-bold">🏆 1200 ELO</span>
+        </div>
+        <p id="modalHobby" class="text-xs text-gray-400 mt-0.5">🏸 Badminton</p>
+        <div id="modalActivity" class="mt-2 inline-block px-3 py-1 rounded-xl bg-surface-950 text-xs font-mono text-vibe-emerald">Online</div>
+      </div>
+      <div id="modalUnlockedBox" class="p-3.5 rounded-2xl bg-vibe-emerald/10 border border-vibe-emerald/30 space-y-1 text-xs">
+        <div class="font-mono uppercase text-[10px] text-vibe-emerald font-bold">Unlocked Identity</div>
+        <div>Name: <span id="modalRealName" class="font-bold text-white"></span></div>
+        <div>Branch: <span id="modalBranch" class="text-gray-200"></span></div>
+        <div>Year: <span id="modalYear" class="text-vibe-emerald font-mono"></span></div>
+      </div>
+      <div id="modalLockedBox" class="hidden p-4 rounded-2xl bg-surface-950 border border-dashed border-amber-500/40 text-xs text-amber-300">
+        🔒 Private Account — Add Friend to see Real Name, Branch & Year
+      </div>
+      <div id="modalActionBtns" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: SKYWALKER042 ADMIN COMMAND CENTER ================= -->
+  <div id="adminModal" class="fixed inset-0 z-50 hidden bg-surface-950/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-5xl glass-card rounded-3xl p-6 max-h-[85vh] flex flex-col">
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-surface-800">
+        <div>
+          <span class="font-mono text-xs font-bold text-vibe-amber">🛡️ ROOT ADMIN PORTAL: Skywalker042</span>
+          <p class="text-[11px] text-gray-400">Full access to all registered NIT Agartala user accounts & cloud backups</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="syncFromCloudDB()" class="px-3 py-1.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-vibe-emerald font-mono text-xs">🔄 Refresh Cloud</button>
+          <button onclick="exportDatabaseJSON()" class="px-3 py-1.5 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">⬇ Export JSON</button>
+          <label class="cursor-pointer px-3 py-1.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-xs text-gray-200 font-mono">
+            ⬆ Import JSON
+            <input type="file" accept=".json" onchange="importDatabaseJSON(event)" class="hidden">
+          </label>
+          <button onclick="closeAdminModal()" class="px-3 py-1.5 rounded-xl bg-vibe-coral/20 text-vibe-coral text-xs font-bold">Close</button>
+        </div>
+      </div>
+      <div class="overflow-y-auto flex-1 mt-4">
+        <table class="w-full text-left text-xs">
+          <thead class="text-gray-400 font-mono uppercase border-b border-surface-800">
+            <tr><th class="py-2">Handle</th><th>Full Name</th><th>Branch & Year</th><th>ELO Rating</th><th>Privacy</th><th>Live Activity</th></tr>
+          </thead>
+          <tbody id="adminTableBody" class="divide-y divide-surface-800"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="music.js"></script>
+  <script src="arcade.js"></script>
+
+  <!-- ================= PRODUCTION CLEANUP & CLOUD DATABASE SYNC ENGINE ================= -->
+  <script>
+    // Optional: Paste your free Firebase Realtime Database URL below (e.g. "https://frien-nita-default-rtdb.firebaseio.com")
+    // When set, every registered user is automatically saved to your central Firebase Cloud so you can see everyone as Admin!
+    const CLOUD_DB_URL = "";
+
+    const BOT_HANDLES = ['anup_ece', 'khushi_nita', 'ayush_mech', 'rohan_cse', 'sneha_ee'];
+
+    // 1. Override getUsers & saveUsers so bot accounts are removed and real accounts sync to Cloud
+    window.getUsers = function() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        // Filter out old demo bot accounts that had default password 'nita123'
+        return parsed.filter(u => !(BOT_HANDLES.includes(u.username) && u.password === 'nita123'));
+      } catch (e) {
+        return [];
+      }
+    };
+
+    window.saveUsers = function(users) {
+      const clean = users.filter(u => !(BOT_HANDLES.includes(u.username) && u.password === 'nita123'));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+      const el = document.getElementById('savedAccountsCount');
+      if (el) el.textContent = clean.length;
+
+      // Push updated user list to Firebase Cloud if URL is configured
+      if (CLOUD_DB_URL) {
+        fetch(`${CLOUD_DB_URL.replace(/\/$/, '')}/users.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(clean)
+        }).catch(() => {});
+      }
+    };
+
+    // 2. Pull latest users from Firebase Cloud into local storage (for Admin & live directory)
+    window.syncFromCloudDB = async function() {
+      if (!CLOUD_DB_URL) {
+        return showToast('Set CLOUD_DB_URL in index.html to enable live Firebase Cloud sync', 'emerald');
+      }
+      try {
+        const res = await fetch(`${CLOUD_DB_URL.replace(/\/$/, '')}/users.json`);
+        const cloudUsers = await res.json();
+        if (Array.isArray(cloudUsers)) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudUsers));
+          renderAll();
+          if (!document.getElementById('adminModal').classList.contains('hidden')) openAdminModal();
+          showToast(`Synced ${cloudUsers.length} users from Cloud Database!`, 'emerald');
+        }
+      } catch (e) {
+        showToast('Cloud sync failed — check internet or Firebase URL', 'coral');
+      }
+    };
+
+    // 3. Allow Admin to Import a backed-up .json file anytime
+    window.importDatabaseJSON = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const imported = JSON.parse(evt.target.result);
+          if (Array.isArray(imported)) {
+            saveUsers(imported);
+            openAdminModal();
+            renderAll();
+            showToast(`Imported ${imported.length} users into database!`, 'emerald');
+          }
+        } catch (err) {
+          showToast('Invalid JSON file', 'coral');
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    // 4. Clean out all trial state (bot friends, bot messages, bot posts, and bot game invites) on startup
+    window.addEventListener('DOMContentLoaded', () => {
+      const realUsers = getUsers();
+      saveUsers(realUsers);
+
+      if (typeof state !== 'undefined') {
+        state.friends = [];
+        state.incomingRequests = [];
+        state.swipePosts = [];
+        state.messages = { 'general-nita': [] };
+      }
+
+      if (typeof musicState !== 'undefined') {
+        musicState.roomMessages = { 'lofi-nita': [], 'bollywood-jam': [], 'gaming-synth': [] };
+        musicState.jamRooms.forEach(r => {
+          r.host = 'campus';
+          r.listeners = [];
+        });
+      }
+
+      if (typeof arcadeState !== 'undefined') {
+        arcadeState.spectators = [];
+        arcadeState.incomingMatchInvites = [];
+        arcadeState.arcadeChat = [];
+      }
+
+      if (CLOUD_DB_URL) syncFromCloudDB();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
