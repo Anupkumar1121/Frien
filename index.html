@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   <link rel="stylesheet" href="style.css">
   <script>
@@ -44,7 +45,7 @@
   <!-- Toast Notifications -->
   <div id="toastContainer" class="fixed top-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- ================= VIEW 1: LOGIN & REGISTRATION (PRODUCTION CLEAN) ================= -->
+  <!-- ================= VIEW 1: LOGIN & REGISTRATION ================= -->
   <div id="authView" class="min-h-screen flex flex-col justify-between p-6 bg-radial-glow">
     <header class="w-full max-w-6xl mx-auto flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -142,7 +143,7 @@
         </button>
       </form>
 
-      <!-- LOGIN FORM (No Trial/Demo Quick-Fill Buttons; Admin Login Works Directly Here) -->
+      <!-- LOGIN FORM -->
       <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4 hidden">
         <div>
           <label class="block text-xs font-mono uppercase text-gray-400 mb-1">Username</label>
@@ -198,7 +199,7 @@
           <span>Friends</span>
           <span id="pendingReqBadge" class="px-1.5 py-0.2 rounded-full bg-vibe-coral text-white text-[10px] font-mono">0</span>
         </button>
-        <!-- Root Admin Button (Only visible when logged in as Skywalker042) -->
+        <!-- Root Admin Button -->
         <button id="navAdmin" onclick="openAdminModal()" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono bg-vibe-amber/20 text-vibe-amber border border-vibe-amber/40">
           <i data-lucide="shield" class="w-3.5 h-3.5"></i> Admin
         </button>
@@ -284,7 +285,7 @@
         </div>
       </section>
 
-      <!-- ================= TAB 3: MUSIC LOUNGE (WITH ROOM CHAT & INVITES) ================= -->
+      <!-- ================= TAB 3: MUSIC LOUNGE ================= -->
       <section id="tabMusicView" class="hidden flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 overflow-hidden min-w-0">
         <div class="w-full lg:w-64 glass-card rounded-3xl flex flex-col overflow-hidden shrink-0">
           <div class="p-3.5 border-b border-surface-800 space-y-2">
@@ -600,15 +601,10 @@
       <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-surface-800">
         <div>
           <span class="font-mono text-xs font-bold text-vibe-amber">🛡️ ROOT ADMIN PORTAL: Skywalker042</span>
-          <p class="text-[11px] text-gray-400">Full access to all registered NIT Agartala user accounts & cloud backups</p>
+          <p class="text-[11px] text-gray-400">Full access to all registered NIT Agartala user accounts & database backups</p>
         </div>
         <div class="flex items-center gap-2">
-          <button onclick="syncFromCloudDB()" class="px-3 py-1.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-vibe-emerald font-mono text-xs">🔄 Refresh Cloud</button>
           <button onclick="exportDatabaseJSON()" class="px-3 py-1.5 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">⬇ Export JSON</button>
-          <label class="cursor-pointer px-3 py-1.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-xs text-gray-200 font-mono">
-            ⬆ Import JSON
-            <input type="file" accept=".json" onchange="importDatabaseJSON(event)" class="hidden">
-          </label>
           <button onclick="closeAdminModal()" class="px-3 py-1.5 rounded-xl bg-vibe-coral/20 text-vibe-coral text-xs font-bold">Close</button>
         </div>
       </div>
@@ -626,113 +622,5 @@
   <script src="app.js"></script>
   <script src="music.js"></script>
   <script src="arcade.js"></script>
-
-  <!-- ================= PRODUCTION CLEANUP & CLOUD DATABASE SYNC ENGINE ================= -->
-  <script>
-    // Optional: Paste your free Firebase Realtime Database URL below (e.g. "https://frien-nita-default-rtdb.firebaseio.com")
-    // When set, every registered user is automatically saved to your central Firebase Cloud so you can see everyone as Admin!
-    const CLOUD_DB_URL = "";
-
-    const BOT_HANDLES = ['anup_ece', 'khushi_nita', 'ayush_mech', 'rohan_cse', 'sneha_ee'];
-
-    // 1. Override getUsers & saveUsers so bot accounts are removed and real accounts sync to Cloud
-    window.getUsers = function() {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      try {
-        const parsed = JSON.parse(raw);
-        // Filter out old demo bot accounts that had default password 'nita123'
-        return parsed.filter(u => !(BOT_HANDLES.includes(u.username) && u.password === 'nita123'));
-      } catch (e) {
-        return [];
-      }
-    };
-
-    window.saveUsers = function(users) {
-      const clean = users.filter(u => !(BOT_HANDLES.includes(u.username) && u.password === 'nita123'));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-      const el = document.getElementById('savedAccountsCount');
-      if (el) el.textContent = clean.length;
-
-      // Push updated user list to Firebase Cloud if URL is configured
-      if (CLOUD_DB_URL) {
-        fetch(`${CLOUD_DB_URL.replace(/\/$/, '')}/users.json`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(clean)
-        }).catch(() => {});
-      }
-    };
-
-    // 2. Pull latest users from Firebase Cloud into local storage (for Admin & live directory)
-    window.syncFromCloudDB = async function() {
-      if (!CLOUD_DB_URL) {
-        return showToast('Set CLOUD_DB_URL in index.html to enable live Firebase Cloud sync', 'emerald');
-      }
-      try {
-        const res = await fetch(`${CLOUD_DB_URL.replace(/\/$/, '')}/users.json`);
-        const cloudUsers = await res.json();
-        if (Array.isArray(cloudUsers)) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudUsers));
-          renderAll();
-          if (!document.getElementById('adminModal').classList.contains('hidden')) openAdminModal();
-          showToast(`Synced ${cloudUsers.length} users from Cloud Database!`, 'emerald');
-        }
-      } catch (e) {
-        showToast('Cloud sync failed — check internet or Firebase URL', 'coral');
-      }
-    };
-
-    // 3. Allow Admin to Import a backed-up .json file anytime
-    window.importDatabaseJSON = function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        try {
-          const imported = JSON.parse(evt.target.result);
-          if (Array.isArray(imported)) {
-            saveUsers(imported);
-            openAdminModal();
-            renderAll();
-            showToast(`Imported ${imported.length} users into database!`, 'emerald');
-          }
-        } catch (err) {
-          showToast('Invalid JSON file', 'coral');
-        }
-      };
-      reader.readAsText(file);
-    };
-
-    // 4. Clean out all trial state (bot friends, bot messages, bot posts, and bot game invites) on startup
-    window.addEventListener('DOMContentLoaded', () => {
-      const realUsers = getUsers();
-      saveUsers(realUsers);
-
-      if (typeof state !== 'undefined') {
-        state.friends = [];
-        state.incomingRequests = [];
-        state.swipePosts = [];
-        state.messages = { 'general-nita': [] };
-      }
-
-      if (typeof musicState !== 'undefined') {
-        musicState.roomMessages = { 'lofi-nita': [], 'bollywood-jam': [], 'gaming-synth': [] };
-        musicState.jamRooms.forEach(r => {
-          r.host = 'campus';
-          r.listeners = [];
-        });
-      }
-
-      if (typeof arcadeState !== 'undefined') {
-        arcadeState.spectators = [];
-        arcadeState.incomingMatchInvites = [];
-        arcadeState.arcadeChat = [];
-      }
-
-      if ("https://frien-5b4ef-default-rtdb.asia-southeast1.firebasedatabase.app") syncFromCloudDB();
-      renderAll();
-    });
-  </script>
 </body>
 </html>

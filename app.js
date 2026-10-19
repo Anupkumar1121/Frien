@@ -1,69 +1,18 @@
-const STORAGE_KEY = 'frien_nita_users_v4';
+// ============================================================================
+// PRODUCTION APP.JS: SOCKET.IO SYNC, REAL DMs, 2-STEP FRIEND REQUESTS & SWIPE
+// ============================================================================
+const STORAGE_KEY = 'frien_nita_users_v5_prod';
 const ADMIN_ID = 'Skywalker042';
 const ADMIN_PASS = '$kywalk3r(anup)';
+
+// Connect to the live Render Socket.io server
+const socket = typeof io !== 'undefined' ? io() : null;
 
 const LOUNGES = [
   { id: 'general-nita', name: 'general-nita', sub: 'Main NIT Agartala hangout' },
   { id: 'ece-hub', name: 'ece-hub', sub: 'ECE Labs, Laser Physics & Projects' },
   { id: 'badminton-club', name: 'badminton-club', sub: 'Morning court matches & footwork' },
   { id: 'gaming-squad', name: 'gaming-squad', sub: 'Valorant, Wuthering Waves & Chess' }
-];
-
-const INITIAL_SWIPE_POSTS = [
-  {
-    id: 1,
-    author: 'khushi_nita',
-    caption: 'Golden hour right outside the NIT Agartala Knowledge Center ✨ Who is up for evening badminton?',
-    mediaType: 'image',
-    mediaUrl: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=900&q=80',
-    likes: 42,
-    likedByMe: false,
-    tag: 'Campus Life',
-    comments: [{ user: 'anup_ece', text: 'Count me in for 6 PM court!' }]
-  },
-  {
-    id: 2,
-    author: 'ayush_mech',
-    caption: 'Late night Valorant & Chess grind in the hostel 🔥 Drop your tags in comments!',
-    mediaType: 'image',
-    mediaUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=900&q=80',
-    likes: 29,
-    likedByMe: false,
-    tag: 'Hostel Gaming',
-    comments: [{ user: 'rohan_cse', text: 'Joining your Chess lobby in 5 mins!' }]
-  },
-  {
-    id: 3,
-    author: 'rohan_cse',
-    caption: 'Built a new Python project after finishing the CS50 problem sets 💻',
-    mediaType: 'image',
-    mediaUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=900&q=80',
-    likes: 64,
-    likedByMe: false,
-    tag: 'Tech & Code',
-    comments: []
-  }
-];
-
-const ENDLESS_POOL = [
-  {
-    author: 'sneha_ee',
-    caption: 'Evening jam session at the amphitheater 🎸 What song should we queue next?',
-    mediaUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80',
-    tag: 'Music Club'
-  },
-  {
-    author: 'anup_ece',
-    caption: 'Early morning badminton session before 1st-year Engineering Mechanics lecture 🏸',
-    mediaUrl: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=900&q=80',
-    tag: 'Sports Complex'
-  },
-  {
-    author: 'khushi_nita',
-    caption: 'Exploring new UI prototypes in Figma for our college tech fest 🎨',
-    mediaUrl: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=900&q=80',
-    tag: 'Design'
-  }
 ];
 
 let state = {
@@ -73,16 +22,35 @@ let state = {
   activeChatId: 'general-nita',
   activeChatType: 'lounge',
   chatMedia: null,
-  friends: ['khushi_nita'],
-  incomingRequests: ['ayush_mech', 'sneha_ee'],
-  swipePosts: [...INITIAL_SWIPE_POSTS],
+  users: [],
+  friends: [],
+  incomingRequests: [],
+  outgoingRequests: [],
+  allFriendships: {},
+  allIncomingRequests: {},
+  allOutgoingRequests: {},
+  swipePosts: [],
   messages: {
-    'general-nita': [
-      { sender: 'khushi_nita', text: 'Love the new Ranked Arcade and Swipe feed!', time: '11:20 AM' },
-      { sender: 'ayush_mech', text: 'Sent a 1v1 Chess invite! Check the right radar or Arcade tab.', time: '11:22 AM' }
-    ]
+    'general-nita': []
   }
 };
+
+// Helper: Generate a shared conversation key so DMs between User A and User B go to the exact same room
+function getConversationKey(type, targetId) {
+  if (type === 'lounge') return targetId;
+  if (!state.currentUser) return targetId;
+  return 'dm_' + [state.currentUser.username, targetId].sort().join('__');
+}
+
+// Helper: Convert uploaded image/video files into Base64 so other devices can view them
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 function getRankTier(elo = 1200) {
   if (elo >= 1450) return '👑 Grandmaster';
@@ -93,38 +61,99 @@ function getRankTier(elo = 1200) {
 }
 
 function getUsers() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  const defaultEloMap = {
-    anup_ece: 1340,
-    khushi_nita: 1280,
-    ayush_mech: 1420,
-    rohan_cse: 1365,
-    sneha_ee: 1210
-  };
-
-  if (raw) {
-    const parsed = JSON.parse(raw);
-    return parsed.map(u => ({
-      ...u,
-      elo: typeof u.elo === 'number' ? u.elo : (defaultEloMap[u.username] || 1200)
-    }));
-  }
-
-  const seed = [
-    { username: 'anup_ece', password: 'nita123', fullName: 'Anup Kumar', branch: 'ECE', presentYear: '1st Year', hobby: '🏸 Badminton', privacy: 'private', statusState: 'online', activityText: '🔥 Swiping Feed', elo: 1340 },
-    { username: 'khushi_nita', password: 'nita123', fullName: 'Khushi Sharma', branch: 'ECE', presentYear: '1st Year', hobby: '🎨 UI/UX Design', privacy: 'private', statusState: 'online', activityText: '🎧 Listening to Starboy', elo: 1280 },
-    { username: 'ayush_mech', password: 'nita123', fullName: 'Ayush Verma', branch: 'Mechanical (ME)', presentYear: '2nd Year', hobby: '🎮 PC Gaming', privacy: 'private', statusState: 'online', activityText: '♟️ Waiting in Chess (1/2)', elo: 1420 },
-    { username: 'rohan_cse', password: 'nita123', fullName: 'Rohan Das', branch: 'CSE', presentYear: '3rd Year', hobby: '💻 Coding', privacy: 'public', statusState: 'idle', activityText: '🌙 Idle / Away', elo: 1365 },
-    { username: 'sneha_ee', password: 'nita123', fullName: 'Sneha Roy', branch: 'EE', presentYear: '1st Year', hobby: '🎧 Music', privacy: 'private', statusState: 'offline', activityText: '⚫ Offline', elo: 1210 }
-  ];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
-  return seed;
+  return state.users || [];
 }
 
-function saveUsers(users) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+function saveUsers(usersList) {
+  state.users = usersList;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(usersList));
   const el = document.getElementById('savedAccountsCount');
-  if (el) el.textContent = users.length;
+  if (el) el.textContent = usersList.length;
+}
+
+function syncMyFriendArrays() {
+  if (!state.currentUser) return;
+  const me = state.currentUser.username;
+  state.friends = state.allFriendships[me] || [];
+  state.incomingRequests = state.allIncomingRequests[me] || [];
+  state.outgoingRequests = state.allOutgoingRequests[me] || [];
+}
+
+// ================= SOCKET.IO REAL-TIME LISTENERS =================
+if (socket) {
+  socket.on('sync_state', (serverDB) => {
+    state.users = serverDB.users || [];
+    state.swipePosts = serverDB.swipePosts || [];
+    state.messages = serverDB.messages || { 'general-nita': [] };
+    state.allFriendships = serverDB.friendships || {};
+    state.allIncomingRequests = serverDB.incomingRequests || {};
+    state.allOutgoingRequests = serverDB.outgoingRequests || {};
+
+    if (typeof musicState !== 'undefined' && serverDB.roomMessages) {
+      musicState.roomMessages = serverDB.roomMessages;
+    }
+    if (typeof arcadeState !== 'undefined' && serverDB.arcadeChat) {
+      arcadeState.arcadeChat = serverDB.arcadeChat;
+    }
+
+    saveUsers(state.users);
+    syncMyFriendArrays();
+    if (state.currentUser) renderAll();
+  });
+
+  socket.on('sync_users', (data) => {
+    state.users = data.users || [];
+    state.allFriendships = data.friendships || {};
+    state.allIncomingRequests = data.incomingRequests || {};
+    state.allOutgoingRequests = data.outgoingRequests || {};
+    saveUsers(state.users);
+    syncMyFriendArrays();
+    if (state.currentUser) {
+      const updatedMe = state.users.find(u => u.username === state.currentUser.username);
+      if (updatedMe) state.currentUser.elo = updatedMe.elo;
+      renderAll();
+    }
+  });
+
+  socket.on('sync_friends', (data) => {
+    state.allFriendships = data.friendships || {};
+    state.allIncomingRequests = data.incomingRequests || {};
+    state.allOutgoingRequests = data.outgoingRequests || {};
+    syncMyFriendArrays();
+
+    if (state.currentUser) {
+      if (data.type === 'request_sent' && data.notifyTarget === state.currentUser.username) {
+        showToast(`👋 New friend request from @${data.notifyFrom}! Check the Friends tab.`, 'emerald');
+      } else if (data.type === 'request_accepted' && data.notifyTarget === state.currentUser.username) {
+        showToast(`🎉 @${data.notifyFrom} accepted your friend request! Identity unlocked.`, 'emerald');
+      }
+      renderAll();
+    }
+  });
+
+  socket.on('new_chat_message', ({ chatId, message }) => {
+    if (!state.messages[chatId]) state.messages[chatId] = [];
+    state.messages[chatId].push(message);
+    if (state.currentUser) {
+      renderChatSection();
+      const activeKey = getConversationKey(state.activeChatType, state.activeChatId);
+      if (message.sender !== state.currentUser.username && chatId !== activeKey && chatId.includes(state.currentUser.username)) {
+        showToast(`💬 New DM from @${message.sender}`, 'emerald');
+      }
+    }
+  });
+
+  socket.on('sync_swipe_posts', (posts) => {
+    state.swipePosts = posts || [];
+    if (state.currentUser) renderSwipeFeed();
+  });
+
+  socket.on('sync_music_chat', ({ roomId, roomMessages }) => {
+    if (typeof musicState !== 'undefined') {
+      musicState.roomMessages = roomMessages;
+      if (typeof renderRoomChat === 'function') renderRoomChat();
+    }
+  });
 }
 
 // ================= AUTHENTICATION =================
@@ -140,16 +169,11 @@ function switchAuthTab(tab) {
     : 'flex-1 py-2.5 rounded-xl font-display font-semibold text-sm text-gray-400';
 }
 
-function quickFill(u, p) {
-  document.getElementById('loginUsername').value = u;
-  document.getElementById('loginPassword').value = p;
-}
-
 function handleRegister(e) {
   e.preventDefault();
   const username = document.getElementById('regUsername').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-  const users = getUsers();
-  if (users.some(u => u.username === username)) return showToast('Username already exists!', 'coral');
+  if (!username) return showToast('Enter a valid handle!', 'coral');
+  if (state.users.some(u => u.username === username)) return showToast('Username already taken!', 'coral');
 
   const newUser = {
     username,
@@ -163,8 +187,9 @@ function handleRegister(e) {
     activityText: '🔥 Swiping Feed',
     elo: 1200
   };
-  users.push(newUser);
-  saveUsers(users);
+
+  state.users.push(newUser);
+  if (socket) socket.emit('upsert_user', newUser);
   enterApp(newUser, false);
 }
 
@@ -174,7 +199,7 @@ function handleLogin(e) {
   const p = document.getElementById('loginPassword').value;
 
   if (u === ADMIN_ID && p === ADMIN_PASS) {
-    enterApp({
+    const adminObj = {
       username: 'skywalker042',
       fullName: 'Anup Kumar (Root Admin)',
       branch: 'NITA Admin',
@@ -184,40 +209,46 @@ function handleLogin(e) {
       statusState: 'online',
       activityText: '⚡ Root Command',
       elo: 1500
-    }, true);
+    };
+    enterApp(adminObj, true);
     return;
   }
 
-  const users = getUsers();
-  const found = users.find(x => x.username === u.toLowerCase() && x.password === p);
-  if (!found) return showToast('Invalid credentials!', 'coral');
+  const found = state.users.find(x => x.username === u.toLowerCase() && x.password === p);
+  if (!found) return showToast('Invalid username or password!', 'coral');
 
   found.statusState = 'online';
   found.activityText = '🔥 Swiping Feed';
-  saveUsers(users);
+  if (socket) socket.emit('upsert_user', found);
   enterApp(found, false);
 }
 
 function enterApp(user, isAdmin) {
   state.currentUser = user;
   state.isAdmin = isAdmin;
+  syncMyFriendArrays();
   document.getElementById('authView').classList.add('hidden');
   document.getElementById('dashboardView').classList.remove('hidden');
   document.getElementById('navAdmin').classList.toggle('hidden', !isAdmin);
   renderAll();
-  setupEndlessScrollSensor();
-  showToast(`Welcome @${user.username} (${user.elo || 1200} ELO)!`, 'emerald');
+  showToast(`Welcome @${user.username}!`, 'emerald');
 }
 
 function logout() {
+  if (state.currentUser && !state.isAdmin) {
+    state.currentUser.statusState = 'offline';
+    state.currentUser.activityText = '⚫ Offline';
+    if (socket) socket.emit('upsert_user', state.currentUser);
+  }
   state.currentUser = null;
+  state.isAdmin = false;
   document.getElementById('dashboardView').classList.add('hidden');
   document.getElementById('authView').classList.remove('hidden');
 }
 
-// ================= PRIVACY LOGIC =================
+// ================= PRIVACY & STATUS =================
 function canSeeIdentity(targetUser) {
-  if (!state.currentUser) return false;
+  if (!state.currentUser || !targetUser) return false;
   if (state.isAdmin) return true;
   if (targetUser.username === state.currentUser.username) return true;
   if (targetUser.privacy === 'public') return true;
@@ -226,38 +257,52 @@ function canSeeIdentity(targetUser) {
 }
 
 function toggleMyPrivacy() {
+  if (!state.currentUser) return;
   state.currentUser.privacy = state.currentUser.privacy === 'private' ? 'public' : 'private';
-  const users = getUsers();
-  const idx = users.findIndex(u => u.username === state.currentUser.username);
-  if (idx !== -1) {
-    users[idx] = state.currentUser;
-    saveUsers(users);
-  }
+  if (socket) socket.emit('upsert_user', state.currentUser);
   renderAll();
-  showToast(`Account is now ${state.currentUser.privacy.toUpperCase()}`, 'emerald');
+  showToast(`Account switched to ${state.currentUser.privacy.toUpperCase()} mode`, 'emerald');
 }
 
 function setActivity(statusState, activityText) {
   if (!state.currentUser) return;
   state.currentUser.statusState = statusState;
   state.currentUser.activityText = activityText;
-  const users = getUsers();
-  const idx = users.findIndex(u => u.username === state.currentUser.username);
-  if (idx !== -1) {
-    users[idx] = state.currentUser;
-    saveUsers(users);
-  }
+  if (socket) socket.emit('upsert_user', state.currentUser);
   renderHeaderAndRadar();
 }
 
-// ================= ENDLESS SWIPE FEED ENGINE =================
+// ================= CAMPUS SWIPE FEED (PERSISTENT, NO TRIAL BOTS) =================
 function renderSwipeFeed() {
   const container = document.getElementById('swipeFeedContainer');
   if (!container) return;
+
+  if (state.swipePosts.length === 0) {
+    container.innerHTML = `
+      <div class="h-[calc(100vh-140px)] w-full rounded-3xl glass-card flex flex-col items-center justify-center p-8 text-center space-y-3">
+        <div class="text-4xl">📸</div>
+        <h3 class="font-display font-bold text-lg text-white">No Campus Swipe Posts Yet</h3>
+        <p class="text-xs text-gray-400 max-w-xs">Be the first NIT Agartala student to share a photo, video, or campus thought!</p>
+        <button onclick="openCreatePostModal()" class="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-vibe-coral to-pink-600 text-white font-display font-bold text-xs shadow-xl">
+          + Share First Post
+        </button>
+      </div>
+    `;
+    return;
+  }
+
   const users = getUsers();
+  const myUsername = state.currentUser ? state.currentUser.username : '';
 
   container.innerHTML = state.swipePosts.map(post => {
-    const authorObj = users.find(u => u.username === post.author) || { username: post.author, fullName: post.author, branch: 'NITA', presentYear: '', privacy: 'private', elo: 1200 };
+    const authorObj = users.find(u => u.username === post.author) || {
+      username: post.author,
+      fullName: post.author,
+      branch: 'NITA',
+      presentYear: '',
+      privacy: 'private',
+      elo: 1200
+    };
     const unlocked = canSeeIdentity(authorObj);
     const identityBadge = unlocked
       ? `<span class="text-[11px] text-vibe-emerald">${authorObj.fullName} • ${authorObj.branch} (${authorObj.presentYear})</span>`
@@ -267,7 +312,10 @@ function renderSwipeFeed() {
       ? `<video src="${post.mediaUrl}" controls loop class="w-full h-full object-cover"></video>`
       : `<img src="${post.mediaUrl}" class="w-full h-full object-cover select-none" alt="Swipe Media">`;
 
-    const commentsHTML = post.comments.map(c =>
+    const likedByMe = Array.isArray(post.likedByUsers) && post.likedByUsers.includes(myUsername);
+    const likeCount = Array.isArray(post.likedByUsers) ? post.likedByUsers.length : (post.likes || 0);
+
+    const commentsHTML = (post.comments || []).map(c =>
       `<div class="text-xs"><span class="font-mono font-bold text-vibe-emerald">@${c.user}:</span> <span class="text-gray-200">${c.text}</span></div>`
     ).join('');
 
@@ -292,7 +340,7 @@ function renderSwipeFeed() {
               ${identityBadge}
             </div>
           </div>
-          <span class="px-3 py-1 rounded-full bg-surface-900/80 border border-surface-700 text-[11px] font-mono text-gray-300">${post.tag}</span>
+          <span class="px-3 py-1 rounded-full bg-surface-900/80 border border-surface-700 text-[11px] font-mono text-gray-300">${post.tag || 'Campus Post'}</span>
         </div>
 
         <div class="relative z-10 p-5 space-y-3">
@@ -300,8 +348,8 @@ function renderSwipeFeed() {
             <p class="text-sm text-white leading-relaxed flex-1">${post.caption}</p>
             <div class="flex flex-col items-center gap-3 bg-surface-900/80 backdrop-blur-md p-2.5 rounded-2xl border border-surface-700">
               <button onclick="toggleLike(${post.id})" class="flex flex-col items-center">
-                <span class="text-xl">${post.likedByMe ? '❤️' : '🤍'}</span>
-                <span class="text-[11px] font-mono text-white mt-0.5">${post.likes}</span>
+                <span class="text-xl">${likedByMe ? '❤️' : '🤍'}</span>
+                <span class="text-[11px] font-mono text-white mt-0.5">${likeCount}</span>
               </button>
               <button onclick="openPeerModal('${post.author}')" title="View Profile" class="text-xs text-vibe-emerald font-mono">👤</button>
             </div>
@@ -323,51 +371,16 @@ function renderSwipeFeed() {
 
 function scrollSwipeFeed(direction) {
   const container = document.getElementById('swipeFeedContainer');
-  container.scrollBy({ top: direction * container.clientHeight, behavior: 'smooth' });
-}
-
-function setupEndlessScrollSensor() {
-  const container = document.getElementById('swipeFeedContainer');
-  if (!container) return;
-  container.addEventListener('scroll', () => {
-    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
-      appendMoreEndlessPosts();
-    }
-  });
-}
-
-function appendMoreEndlessPosts() {
-  const pick = ENDLESS_POOL[Math.floor(Math.random() * ENDLESS_POOL.length)];
-  state.swipePosts.push({
-    id: Date.now() + Math.floor(Math.random() * 1000),
-    author: pick.author,
-    caption: pick.caption,
-    mediaType: 'image',
-    mediaUrl: pick.mediaUrl,
-    likes: Math.floor(Math.random() * 80) + 10,
-    likedByMe: false,
-    tag: pick.tag,
-    comments: []
-  });
-  renderSwipeFeed();
+  if (container) container.scrollBy({ top: direction * container.clientHeight, behavior: 'smooth' });
 }
 
 function toggleLike(postId) {
-  const post = state.swipePosts.find(p => p.id === postId);
-  if (!post) return;
-  post.likedByMe = !post.likedByMe;
-  post.likes += post.likedByMe ? 1 : -1;
-  renderSwipeFeed();
+  if (!state.currentUser || !socket) return;
+  socket.emit('toggle_swipe_like', { postId, username: state.currentUser.username });
 }
 
 function doubleTapLike(postId) {
-  const post = state.swipePosts.find(p => p.id === postId);
-  if (!post) return;
-  if (!post.likedByMe) {
-    post.likedByMe = true;
-    post.likes += 1;
-    renderSwipeFeed();
-  }
+  toggleLike(postId);
   const burst = document.getElementById(`heartBurst-${postId}`);
   if (burst) {
     burst.classList.remove('hidden');
@@ -379,12 +392,14 @@ function addSwipeComment(e, postId) {
   e.preventDefault();
   const input = document.getElementById(`commentInput-${postId}`);
   const text = input.value.trim();
-  if (!text) return;
-  const post = state.swipePosts.find(p => p.id === postId);
-  if (post) {
-    post.comments.push({ user: state.currentUser.username, text });
-    renderSwipeFeed();
+  if (!text || !state.currentUser) return;
+  if (socket) {
+    socket.emit('add_swipe_comment', {
+      postId,
+      comment: { user: state.currentUser.username, text }
+    });
   }
+  input.value = '';
 }
 
 function openCreatePostModal() {
@@ -395,7 +410,7 @@ function closeCreatePostModal() {
   document.getElementById('createPostModal').classList.add('hidden');
 }
 
-function submitNewSwipePost(e) {
+async function submitNewSwipePost(e) {
   e.preventDefault();
   const fileInput = document.getElementById('postMediaInput');
   const caption = document.getElementById('postCaptionInput').value.trim();
@@ -404,31 +419,36 @@ function submitNewSwipePost(e) {
 
   if (fileInput.files && fileInput.files[0]) {
     const file = fileInput.files[0];
-    mediaUrl = URL.createObjectURL(file);
+    mediaUrl = await fileToDataURL(file);
     mediaType = file.type.startsWith('video') ? 'video' : 'image';
   }
 
-  state.swipePosts.unshift({
+  const newPost = {
     id: Date.now(),
     author: state.currentUser.username,
     caption,
     mediaType,
     mediaUrl,
     likes: 1,
-    likedByMe: true,
-    tag: 'Fresh Campus Post',
+    likedByUsers: [state.currentUser.username],
+    tag: 'Campus Post',
     comments: []
-  });
+  };
+
+  if (socket) {
+    socket.emit('create_swipe_post', newPost);
+  } else {
+    state.swipePosts.unshift(newPost);
+    renderSwipeFeed();
+  }
 
   document.getElementById('postCaptionInput').value = '';
   fileInput.value = '';
   closeCreatePostModal();
-  renderSwipeFeed();
-  document.getElementById('swipeFeedContainer').scrollTo({ top: 0, behavior: 'smooth' });
   showToast('Published to Campus Swipe!', 'emerald');
 }
 
-// ================= LOUNGE & DMS =================
+// ================= LOUNGE & DIRECT MESSAGES (REAL-TIME CROSS-DEVICE) =================
 function renderChatSection() {
   const loungeList = document.getElementById('loungeList');
   if (!loungeList) return;
@@ -441,22 +461,32 @@ function renderChatSection() {
 
   const dmList = document.getElementById('dmList');
   const peers = getUsers().filter(u => u.username !== state.currentUser?.username);
-  dmList.innerHTML = peers.map(u => `
-    <button onclick="selectChat('dm', '${u.username}')" class="w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-mono flex items-center justify-between transition ${state.activeChatType === 'dm' && state.activeChatId === u.username ? 'bg-vibe-emerald/15 text-vibe-emerald font-bold' : 'text-gray-400 hover:bg-surface-850'}">
-      <span>@${u.username}</span>
-      <span class="text-[10px] text-vibe-amber">${u.elo || 1200}</span>
-    </button>
-  `).join('');
+  dmList.innerHTML = peers.length === 0
+    ? `<div class="text-[11px] font-mono text-gray-500 px-2">No other students registered yet</div>`
+    : peers.map(u => `
+      <button onclick="selectChat('dm', '${u.username}')" class="w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-mono flex items-center justify-between transition ${state.activeChatType === 'dm' && state.activeChatId === u.username ? 'bg-vibe-emerald/15 text-vibe-emerald font-bold' : 'text-gray-400 hover:bg-surface-850'}">
+        <span>@${u.username}</span>
+        <span class="text-[10px] text-vibe-amber">${u.elo || 1200}</span>
+      </button>
+    `).join('');
 
   document.getElementById('chatHeaderTitle').textContent = state.activeChatType === 'lounge' ? `#${state.activeChatId}` : `@${state.activeChatId}`;
-  const msgs = state.messages[state.activeChatId] || [];
-  const users = getUsers();
 
-  document.getElementById('messagesContainer').innerHTML = msgs.map(m => {
+  const convKey = getConversationKey(state.activeChatType, state.activeChatId);
+  const msgs = state.messages[convKey] || [];
+  const users = getUsers();
+  const container = document.getElementById('messagesContainer');
+
+  if (msgs.length === 0) {
+    container.innerHTML = `<div class="text-center py-10 text-xs font-mono text-gray-500">No messages yet. Say hello!</div>`;
+    return;
+  }
+
+  container.innerHTML = msgs.map(m => {
     const sender = users.find(u => u.username === m.sender) || { username: m.sender, privacy: 'private', elo: 1200 };
     const badge = canSeeIdentity(sender)
       ? `<span class="text-[10px] text-vibe-emerald">${sender.fullName} (${sender.branch}) • ${sender.elo || 1200} ELO</span>`
-      : `<span class="text-[10px] text-amber-400">🔒 Hidden Identity • ${sender.elo || 1200} ELO</span>`;
+      : `<span class="text-[10px] text-amber-400">🔒 Private Identity • ${sender.elo || 1200} ELO</span>`;
     const mediaHTML = m.media
       ? (m.media.type === 'video'
         ? `<video src="${m.media.url}" controls class="mt-2 max-w-xs rounded-2xl"></video>`
@@ -470,11 +500,12 @@ function renderChatSection() {
           ${badge}
           <span class="text-[10px] text-gray-500 ml-auto">${m.time}</span>
         </div>
-        <p class="text-xs text-gray-200 mt-1">${m.text}</p>
+        <p class="text-xs text-gray-200 mt-1 break-words">${m.text}</p>
         ${mediaHTML}
       </div>
     `;
   }).join('');
+  container.scrollTop = container.scrollHeight;
 }
 
 function selectChat(type, id) {
@@ -483,10 +514,15 @@ function selectChat(type, id) {
   renderChatSection();
 }
 
-function handleChatMedia(e) {
+async function handleChatMedia(e) {
   const file = e.target.files[0];
   if (!file) return;
-  state.chatMedia = { type: file.type.startsWith('video') ? 'video' : 'image', url: URL.createObjectURL(file), name: file.name };
+  const dataUrl = await fileToDataURL(file);
+  state.chatMedia = {
+    type: file.type.startsWith('video') ? 'video' : 'image',
+    url: dataUrl,
+    name: file.name
+  };
   document.getElementById('chatMediaName').textContent = file.name;
   document.getElementById('chatMediaPreview').classList.remove('hidden');
 }
@@ -501,26 +537,31 @@ function sendChatMessage(e) {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text && !state.chatMedia) return;
-  if (!state.messages[state.activeChatId]) state.messages[state.activeChatId] = [];
-  state.messages[state.activeChatId].push({
+
+  const convKey = getConversationKey(state.activeChatType, state.activeChatId);
+  const msgObj = {
     sender: state.currentUser.username,
     text,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     media: state.chatMedia
-  });
+  };
+
+  if (socket) {
+    socket.emit('send_chat_message', { chatId: convKey, message: msgObj });
+  } else {
+    if (!state.messages[convKey]) state.messages[convKey] = [];
+    state.messages[convKey].push(msgObj);
+    renderChatSection();
+  }
+
   input.value = '';
   clearChatMedia();
-  renderChatSection();
 }
 
-// ================= HEADER, RIGHT RADAR & ELO DISPLAY =================
+// ================= HEADER, RIGHT RADAR & TWO-STEP FRIEND REQUESTS =================
 function renderHeaderAndRadar() {
   const u = state.currentUser;
   if (!u) return;
-
-  // Sync currentUser ELO from storage
-  const latestMe = getUsers().find(x => x.username === u.username);
-  if (latestMe) state.currentUser.elo = latestMe.elo;
 
   document.getElementById('myTopAvatar').textContent = u.username[0].toUpperCase();
   document.getElementById('myTopUsername').textContent = `@${u.username}`;
@@ -531,7 +572,7 @@ function renderHeaderAndRadar() {
   const eloBadge = document.getElementById('myTopEloBadge');
   if (eloBadge) eloBadge.textContent = `${state.currentUser.elo || 1200} ELO`;
 
-  const all = getUsers().map(x => x.username === u.username ? state.currentUser : x);
+  const all = getUsers();
   const online = all.filter(x => x.statusState === 'online');
   const idle = all.filter(x => x.statusState === 'idle');
   const offline = all.filter(x => x.statusState === 'offline');
@@ -561,38 +602,62 @@ function renderHeaderAndRadar() {
   document.getElementById('radarIdleList').innerHTML = idle.map(p => renderCard(p, 'bg-vibe-amber')).join('');
   document.getElementById('radarOfflineList').innerHTML = offline.map(p => renderCard(p, 'bg-gray-600')).join('');
 
-  if (typeof renderArcadeInvitesUI === 'function') {
-    renderArcadeInvitesUI();
-  }
+  if (typeof renderArcadeInvitesUI === 'function') renderArcadeInvitesUI();
 }
 
 function renderFriendsTab() {
   const users = getUsers();
   document.getElementById('requestsGrid').innerHTML = state.incomingRequests.length === 0
-    ? `<div class="text-xs text-gray-500 font-mono">No pending requests</div>`
+    ? `<div class="text-xs text-gray-500 font-mono">No pending friend requests</div>`
     : state.incomingRequests.map(uname => `
       <div class="p-4 rounded-2xl bg-surface-900 border border-surface-800 flex items-center justify-between">
         <div>
           <div class="font-mono font-bold text-sm text-white">@${uname}</div>
-          <div class="text-[11px] text-amber-400">🔒 Private Identity</div>
+          <div class="text-[11px] text-amber-400">🔒 Wants to connect & unlock identity</div>
         </div>
-        <button onclick="acceptFriend('${uname}')" class="px-3.5 py-2 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">Accept</button>
+        <button onclick="acceptFriend('${uname}')" class="px-3.5 py-2 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">Accept Request</button>
       </div>
     `).join('');
 
-  document.getElementById('friendsGrid').innerHTML = state.friends.map(uname => {
-    const u = users.find(x => x.username === uname) || { username: uname, fullName: uname, branch: 'NITA', presentYear: '', elo: 1200 };
-    return `
-      <div class="p-4 rounded-2xl bg-surface-900 border border-vibe-emerald/30 flex items-center justify-between">
-        <div>
-          <div class="font-mono font-bold text-sm text-vibe-emerald">@${u.username} <span class="text-vibe-amber text-xs">(${u.elo || 1200} ELO)</span></div>
-          <div class="text-xs text-white font-semibold">${u.fullName}</div>
-          <div class="text-[11px] text-gray-400">${u.branch} • ${u.presentYear}</div>
+  document.getElementById('friendsGrid').innerHTML = state.friends.length === 0
+    ? `<div class="text-xs text-gray-500 font-mono">No connected friends yet. Click any user on the right radar to send a request!</div>`
+    : state.friends.map(uname => {
+      const u = users.find(x => x.username === uname) || { username: uname, fullName: uname, branch: 'NITA', presentYear: '', elo: 1200 };
+      return `
+        <div class="p-4 rounded-2xl bg-surface-900 border border-vibe-emerald/30 flex items-center justify-between">
+          <div>
+            <div class="font-mono font-bold text-sm text-vibe-emerald">@${u.username} <span class="text-vibe-amber text-xs">(${u.elo || 1200} ELO)</span></div>
+            <div class="text-xs text-white font-semibold">${u.fullName}</div>
+            <div class="text-[11px] text-gray-400">${u.branch} • ${u.presentYear}</div>
+          </div>
+          <button onclick="switchTab('chat'); selectChat('dm', '${u.username}')" class="px-3 py-1.5 rounded-xl bg-surface-800 text-xs text-white">Message</button>
         </div>
-        <button onclick="switchTab('chat'); selectChat('dm', '${u.username}')" class="px-3 py-1.5 rounded-xl bg-surface-800 text-xs text-white">Message</button>
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('');
+}
+
+function sendFriendRequest(targetUsername) {
+  if (!state.currentUser || targetUsername === state.currentUser.username) return;
+  if (socket) {
+    socket.emit('send_friend_request', {
+      from: state.currentUser.username,
+      to: targetUsername
+    });
+  }
+  closePeerModal();
+  showToast(`📩 Friend request sent to @${targetUsername}! Waiting for them to accept.`, 'emerald');
+}
+
+function acceptFriend(requesterUsername) {
+  if (!state.currentUser) return;
+  if (socket) {
+    socket.emit('accept_friend_request', {
+      user: state.currentUser.username,
+      requester: requesterUsername
+    });
+  }
+  closePeerModal();
+  showToast(`🎉 You and @${requesterUsername} are now friends! Identity unlocked.`, 'emerald');
 }
 
 function openPeerModal(username) {
@@ -617,12 +682,25 @@ function openPeerModal(username) {
     document.getElementById('modalYear').textContent = target.presentYear;
   }
 
+  const isMe = state.currentUser && target.username === state.currentUser.username;
   const isFriend = state.friends.includes(target.username);
-  document.getElementById('modalActionBtns').innerHTML = target.username === state.currentUser.username ? '' : `
+  const isIncoming = state.incomingRequests.includes(target.username);
+  const isOutgoing = state.outgoingRequests.includes(target.username);
+
+  let friendActionBtn = '';
+  if (isFriend) {
+    friendActionBtn = `<button disabled class="py-2.5 rounded-xl bg-surface-800 text-vibe-emerald font-mono font-bold text-xs">✓ Friends</button>`;
+  } else if (isIncoming) {
+    friendActionBtn = `<button onclick="acceptFriend('${target.username}')" class="py-2.5 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">✓ Accept Request</button>`;
+  } else if (isOutgoing) {
+    friendActionBtn = `<button disabled class="py-2.5 rounded-xl bg-surface-800 text-vibe-amber font-mono font-bold text-xs">⏳ Request Sent</button>`;
+  } else {
+    friendActionBtn = `<button onclick="sendFriendRequest('${target.username}')" class="py-2.5 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">+ Send Request</button>`;
+  }
+
+  document.getElementById('modalActionBtns').innerHTML = isMe ? '' : `
     <div class="grid grid-cols-2 gap-2">
-      <button onclick="acceptFriend('${target.username}')" class="py-2.5 rounded-xl bg-vibe-emerald text-surface-950 font-bold text-xs">
-        ${isFriend ? '✓ Friends' : '+ Add Friend'}
-      </button>
+      ${friendActionBtn}
       <button onclick="closePeerModal(); switchTab('arcade'); invitePeerToArcade('${target.username}', 'play')" class="py-2.5 rounded-xl bg-vibe-amber text-surface-950 font-bold text-xs">
         ⚔️ Invite 1v1
       </button>
@@ -635,14 +713,6 @@ function openPeerModal(username) {
 
 function closePeerModal() {
   document.getElementById('peerModal').classList.add('hidden');
-}
-
-function acceptFriend(username) {
-  if (!state.friends.includes(username)) state.friends.push(username);
-  state.incomingRequests = state.incomingRequests.filter(x => x !== username);
-  closePeerModal();
-  renderAll();
-  showToast(`Connected with @${username}! Identity unlocked.`, 'emerald');
 }
 
 // ================= ADMIN MODAL =================
@@ -685,10 +755,9 @@ function showToast(msg, color = 'emerald') {
   el.className = `px-4 py-2.5 rounded-2xl glass-card border ${color === 'coral' ? 'border-vibe-coral text-vibe-coral' : 'border-vibe-emerald text-vibe-emerald'} text-xs font-mono shadow-xl`;
   el.textContent = msg;
   document.getElementById('toastContainer').appendChild(el);
-  setTimeout(() => el.remove(), 3000);
+  setTimeout(() => el.remove(), 3200);
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  saveUsers(getUsers());
   lucide.createIcons();
 });

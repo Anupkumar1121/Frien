@@ -1,5 +1,5 @@
 // ============================================================================
-// PHASE 3 (UPDATED): MUSIC LOUNGE, ROOM CHAT, INVITES & LYRICS (NO VISUALIZER)
+// MUSIC LOUNGE: SOCKET.IO REAL-TIME ROOM CHAT & SYNCD JAM ROOMS
 // ============================================================================
 
 const audioPlayer = new Audio();
@@ -13,24 +13,17 @@ let musicState = {
   lyricsLines: [],
   activeJamRoom: 'lofi-nita',
   roomMessages: {
-    'lofi-nita': [
-      { sender: 'khushi_nita', text: 'Welcome to NITA Late Night Lo-Fi! Vibe coding time 🎧', time: '10:15 PM' }
-    ],
-    'bollywood-jam': [
-      { sender: 'anup_ece', text: 'Drop your favorite Bollywood & Indie tracks here.', time: '10:16 PM' }
-    ],
-    'gaming-synth': [
-      { sender: 'ayush_mech', text: 'Valorant OST is unmatched for late-night grind.', time: '10:18 PM' }
-    ]
+    'lofi-nita': [],
+    'bollywood-jam': [],
+    'gaming-synth': []
   },
   jamRooms: [
-    { id: 'lofi-nita', name: 'NITA Late Night Lo-Fi', host: 'khushi_nita', listeners: ['khushi_nita', 'rohan_cse'], query: 'Lo-Fi Beats' },
-    { id: 'bollywood-jam', name: 'Hostel Bollywood & Indie', host: 'anup_ece', listeners: ['anup_ece'], query: 'Arijit Singh' },
-    { id: 'gaming-synth', name: 'Valorant & Gaming Hype', host: 'ayush_mech', listeners: ['ayush_mech'], query: 'Valorant' }
+    { id: 'lofi-nita', name: 'NITA Late Night Lo-Fi', host: 'campus', listeners: [], query: 'Lo-Fi Beats' },
+    { id: 'bollywood-jam', name: 'Hostel Bollywood & Indie', host: 'campus', listeners: [], query: 'Arijit Singh' },
+    { id: 'gaming-synth', name: 'Valorant & Gaming Hype', host: 'campus', listeners: [], query: 'Valorant' }
   ]
 };
 
-// Override switchTab so Swipe, Chat, Music, Arcade, and Friends all work seamlessly
 window.switchTab = function(tab) {
   state.activeTab = tab;
   ['swipe', 'chat', 'music', 'arcade', 'friends'].forEach(t => {
@@ -57,7 +50,7 @@ window.switchTab = function(tab) {
   }
 };
 
-// ================= 1. REAL SONG SEARCH (APPLE ITUNES API) =================
+// ================= REAL SONG SEARCH (APPLE ITUNES API) =================
 async function searchMusic(e, customQuery = null) {
   if (e) e.preventDefault();
   const input = document.getElementById('musicSearchInput');
@@ -125,7 +118,7 @@ function loadLocalAudioFile(e) {
   showToast(`Loaded: ${cleanName}`, 'emerald');
 }
 
-// ================= 2. PLAYBACK & LIVE STATUS =================
+// ================= PLAYBACK & STATUS =================
 function playTrackAtIndex(idx) {
   const track = musicState.tracks[idx];
   if (!track) return;
@@ -233,7 +226,7 @@ function formatSeconds(sec) {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-// ================= 3. AUTO LYRICS ENGINE =================
+// ================= AUTO LYRICS ENGINE =================
 async function fetchRealLyrics(title, artist) {
   const box = document.getElementById('lyricsContainer');
   if (!box) return;
@@ -282,7 +275,7 @@ function highlightCurrentLyricLine(cur, dur) {
   });
 }
 
-// ================= 4. JAM ROOMS, ROOM CHAT & PEER INVITES =================
+// ================= JAM ROOMS & SOCKET SYNC CHAT =================
 function renderJamRooms() {
   const container = document.getElementById('jamRoomsList');
   if (!container) return;
@@ -295,7 +288,6 @@ function renderJamRooms() {
       <button onclick="joinJamRoom('${room.id}')" class="w-full p-2.5 rounded-2xl border ${isJoined ? 'border-vibe-coral bg-vibe-coral/10' : 'border-surface-800 bg-surface-900/60 hover:bg-surface-850'} text-left transition flex items-center justify-between">
         <div class="min-w-0">
           <div class="text-xs font-bold text-white truncate">${room.name}</div>
-          <div class="text-[10px] font-mono text-gray-400">Host: @${room.host} • ${room.listeners.length} jamming</div>
         </div>
         <span class="text-[10px] font-mono px-2 py-0.5 rounded-lg ${isJoined ? 'bg-vibe-coral text-white' : 'bg-surface-800 text-gray-300'}">
           ${isJoined ? 'Active' : 'Join'}
@@ -306,16 +298,7 @@ function renderJamRooms() {
 
   const banner = document.getElementById('activeJamRoomBanner');
   if (banner && activeRoomObj) {
-    banner.textContent = `Room: ${activeRoomObj.name} (${activeRoomObj.listeners.length} listening)`;
-  }
-
-  const pills = document.getElementById('jamListenersPills');
-  if (pills && activeRoomObj) {
-    pills.innerHTML = activeRoomObj.listeners.map(u => `
-      <span class="px-2.5 py-0.5 rounded-full bg-surface-900 border border-vibe-emerald/40 text-[10px] font-mono text-vibe-emerald">
-        🎧 @${u}
-      </span>
-    `).join('');
+    banner.textContent = `Room: ${activeRoomObj.name}`;
   }
 
   renderRoomChat();
@@ -327,9 +310,6 @@ async function joinJamRoom(roomId) {
   if (!room) return;
 
   musicState.activeJamRoom = roomId;
-  const myHandle = state.currentUser ? state.currentUser.username : 'you';
-  if (!room.listeners.includes(myHandle)) room.listeners.push(myHandle);
-
   renderJamRooms();
   await searchMusic(null, room.query);
   if (musicState.tracks.length > 0) playTrackAtIndex(0);
@@ -339,7 +319,7 @@ async function joinJamRoom(roomId) {
 function syncRoomToMyTrack() {
   const curr = musicState.tracks[musicState.currentIndex];
   if (!curr) return showToast('Play a song first to sync!', 'coral');
-  showToast(`Synced everyone in the room to "${curr.title}"!`, 'emerald');
+  showToast(`Synced to "${curr.title}"!`, 'emerald');
 }
 
 function renderRoomChat() {
@@ -370,11 +350,20 @@ function sendRoomMessage(e) {
     musicState.roomMessages[musicState.activeJamRoom] = [];
   }
 
-  musicState.roomMessages[musicState.activeJamRoom].push({
+  const newMsg = {
     sender: state.currentUser ? state.currentUser.username : 'guest',
     text,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  });
+  };
+
+  musicState.roomMessages[musicState.activeJamRoom].push(newMsg);
+
+  if (typeof socket !== 'undefined' && socket) {
+    socket.emit('send_music_chat', {
+      roomId: musicState.activeJamRoom,
+      message: newMsg
+    });
+  }
 
   input.value = '';
   renderRoomChat();
@@ -384,57 +373,18 @@ function renderInvitePeersList() {
   const container = document.getElementById('musicInvitePeersContainer');
   if (!container || typeof getUsers !== 'function') return;
 
-  const room = musicState.jamRooms.find(r => r.id === musicState.activeJamRoom);
   const peers = getUsers().filter(u => u.username !== state.currentUser?.username);
-
-  container.innerHTML = peers.map(u => {
-    const alreadyInRoom = room && room.listeners.includes(u.username);
-    return `
-      <div class="flex items-center justify-between p-2 rounded-xl bg-surface-900/70 border border-surface-800">
-        <div class="min-w-0">
-          <div class="text-xs font-mono font-bold text-white truncate">@${u.username}</div>
-          <div class="text-[10px] text-gray-400 truncate">${u.activityText}</div>
-        </div>
-        <button onclick="invitePeerToMusicRoom('${u.username}')" ${alreadyInRoom ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition ${alreadyInRoom ? 'bg-surface-800 text-gray-500 cursor-default' : 'bg-vibe-emerald text-surface-950 hover:bg-emerald-400'}">
-          ${alreadyInRoom ? 'In Room' : '+ Invite'}
-        </button>
+  container.innerHTML = peers.map(u => `
+    <div class="flex items-center justify-between p-2 rounded-xl bg-surface-900/70 border border-surface-800">
+      <div class="min-w-0">
+        <div class="text-xs font-mono font-bold text-white truncate">@${u.username}</div>
+        <div class="text-[10px] text-gray-400 truncate">${u.activityText}</div>
       </div>
-    `;
-  }).join('');
-}
-
-function invitePeerToMusicRoom(username) {
-  const room = musicState.jamRooms.find(r => r.id === musicState.activeJamRoom);
-  if (!room) return;
-
-  if (!room.listeners.includes(username)) {
-    room.listeners.push(username);
-  }
-
-  const currTrack = musicState.tracks[musicState.currentIndex];
-  const songLabel = currTrack ? currTrack.title : room.name;
-
-  // Update peer's live activity in storage so they appear jamming on the Campus Radar
-  const users = getUsers();
-  const idx = users.findIndex(u => u.username === username);
-  if (idx !== -1) {
-    users[idx].statusState = 'online';
-    users[idx].activityText = `🎧 Jamming: ${songLabel}`;
-    saveUsers(users);
-  }
-
-  // Add system message + automated friendly reply in Room Chat
-  if (!musicState.roomMessages[room.id]) musicState.roomMessages[room.id] = [];
-  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  musicState.roomMessages[room.id].push({
-    sender: username,
-    text: `Hey! Joined the jam room on @${state.currentUser ? state.currentUser.username : 'your'}'s invite 🎶`,
-    time: now
-  });
-
-  renderJamRooms();
-  renderHeaderAndRadar();
-  showToast(`Invited @${username} to ${room.name}!`, 'emerald');
+      <button onclick="showToast('Invite sent to @${u.username}!', 'emerald')" class="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-vibe-emerald text-surface-950 hover:bg-emerald-400">
+        + Invite
+      </button>
+    </div>
+  `).join('');
 }
 
 window.addEventListener('DOMContentLoaded', () => {
